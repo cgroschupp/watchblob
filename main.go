@@ -2,13 +2,17 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/xml"
 	"fmt"
-	"golang.org/x/crypto/ssh/terminal"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 	"syscall"
+
+	"golang.org/x/term"
 )
 
 // The XML response returned by the WatchGuard server
@@ -37,31 +41,46 @@ func main() {
 
 	fmt.Printf("Requesting challenge from %s as user %s\n", host, username)
 	challenge, err := triggerChallengeResponse(&host, &username, &password)
-
-	if err != nil || challenge.LogonStatus != 4 {
-		fmt.Fprintln(os.Stderr, "Did not receive challenge from server")
-		fmt.Fprintf(os.Stderr, "Response: %v\nError: %v\n", challenge, err)
-		os.Exit(1)
-	}
-
-	token := getToken(&challenge)
-	err = logon(&host, &challenge, &token)
-
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Logon failed: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("error: %s", err)
 	}
 
-	fmt.Printf("Login succeeded, you may now (quickly) authenticate OpenVPN with %s as your password\n", token)
+	token := ""
+	switch challenge.LogonStatus {
+	case 4:
+		token = getToken(&challenge)
+		r, err := request(templateUrl(&host, templateResponseUri(challenge.LogonId, &token)))
+		if err != nil {
+			log.Fatalf("error: %s", err)
+		}
+		fmt.Println(r)
+	case 8:
+		token = getToken(&challenge)
+		r, err := request(templateUrl(&host, templateMfaResponseUri(challenge.LogonId, &token)))
+		if err != nil {
+			log.Fatalf("error: %s", err)
+		}
+		fmt.Println(r)
+	default:
+		log.Fatalf("unsupported Login Status")
+	}
+
+	fmt.Printf("Login succeeded, you may now (quickly) authenticate OpenVPN with `%s` and `%s` as your password\n", username, token)
 }
 
 func readCredentials() (string, string, error) {
 	fmt.Printf("Username: ")
 	reader := bufio.NewReader(os.Stdin)
 	username, err := reader.ReadString('\n')
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Printf("Password: ")
-	password, err := terminal.ReadPassword(syscall.Stdin)
+	password, err := term.ReadPassword(syscall.Stdin)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println()
 
 	// If an error occured, I don't care about which one it is.
@@ -81,28 +100,20 @@ func getToken(challenge *Resp) string {
 	return strings.TrimSpace(token)
 }
 
-func logon(host *string, challenge *Resp, token *string) (err error) {
-	resp, err := request(templateUrl(host, templateResponseUri(challenge.LogonId, token)))
-	if err != nil {
-		return
-	}
-
-	if resp.LogonStatus != 1 {
-		err = fmt.Errorf("Challenge/response authentication failed: %v", resp)
-	}
-
-	return
-}
-
 func request(url string) (r Resp, err error) {
+	fmt.Println(url)
 	resp, err := http.Get(url)
 	if err != nil {
 		return
 	}
-
-	defer resp.Body.Close()
-	decoder := xml.NewDecoder(resp.Body)
+	var buf bytes.Buffer
+	tee := io.TeeReader(resp.Body, &buf)
+	decoder := xml.NewDecoder(tee)
 
 	err = decoder.Decode(&r)
+	data, _ := io.ReadAll(&buf)
+	fmt.Printf("%s\n", data)
+	defer resp.Body.Close()
+
 	return
 }
