@@ -1,107 +1,133 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/xml"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"strings"
-	"syscall"
 
-	"golang.org/x/term"
+	"github.com/urfave/cli/v2"
 )
 
-// The XML response returned by the WatchGuard server
-type Resp struct {
-	Action      string `xml:"action"`
-	LogonStatus int    `xml:"logon_status"`
-	LogonId     int    `xml:"logon_id"`
-	Error       string `xml:"errStr"`
-	Challenge   string `xml:"chaStr"`
+var debug bool
+
+type AuthDomain struct {
+	Name string `xml:"name"`
+}
+
+type AuthDomains struct {
+	AuthDomain []AuthDomain `xml:"auth-domain"`
+}
+
+type WatchguardResponse struct {
+	Action      string      `xml:"action"`
+	LogonStatus int         `xml:"logon_status"`
+	LogonId     int         `xml:"logon_id"`
+	AuthDomains AuthDomains `xml:"auth-domain-list"`
+	Error       string      `xml:"errStr"`
+	Challenge   string      `xml:"chaStr"`
 }
 
 func main() {
-	args := os.Args[1:]
+	app := &cli.App{
+		Name:  "watchblob",
+		Usage: "2-factor WatchGuard VPNs with OpenVPN ",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name: "username",
+			},
+			&cli.StringFlag{
+				Name: "password",
+			},
+			&cli.StringFlag{
+				Name: "token",
+			},
+			&cli.StringFlag{
+				Name:     "host",
+				Required: true,
+			},
+			&cli.BoolFlag{
+				Name:  "debug",
+				Value: false,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			username := cCtx.String("username")
+			password := cCtx.String("password")
+			token := cCtx.String("token")
+			var err error
 
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "Usage: watchblob <vpn-host>")
-		os.Exit(1)
+			if username == "" {
+				username, err = readUsername()
+				if err != nil {
+					log.Fatalf("unable to read username: %s", err)
+				}
+			}
+
+			if password == "" {
+				password, err = readPassword()
+				if err != nil {
+					log.Fatalf("unable to read password: %s", err)
+				}
+			}
+			debug = cCtx.Bool("debug")
+
+			run(cCtx.String("host"), username, password, token)
+
+			return nil
+		},
 	}
 
-	host := args[0]
-
-	username, password, err := readCredentials()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not read credentials: %v\n", err)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
 	}
-
-	fmt.Printf("Requesting challenge from %s as user %s\n", host, username)
+}
+func run(host, username, password, token string) {
+	log.Printf("Requesting challenge from %s as user %s\n", host, username)
 	challenge, err := triggerChallengeResponse(&host, &username, &password)
 	if err != nil {
-		log.Fatalf("error: %s", err)
+		log.Fatalf("unable to perform challenge request: %s", err)
 	}
 
-	token := ""
+	if challenge.Error != "" {
+		log.Fatalf("Challenge authentication failed, with login status: %d(%s)", challenge.LogonStatus, challenge.Error)
+	}
+
+	if token == "" {
+		token, err = readToken(&challenge)
+		if err != nil {
+			log.Fatalf("unable to read token: %s", err)
+		}
+	}
+	var response WatchguardResponse
+
 	switch challenge.LogonStatus {
 	case 4:
-		token = getToken(&challenge)
-		r, err := request(templateUrl(&host, templateResponseUri(challenge.LogonId, &token)))
-		if err != nil {
-			log.Fatalf("error: %s", err)
-		}
-		fmt.Println(r)
+		response, err = request(templateUrl(&host, templateResponseUri(challenge.LogonId, &token)))
 	case 8:
-		token = getToken(&challenge)
-		r, err := request(templateUrl(&host, templateMfaResponseUri(challenge.LogonId, &token)))
-		if err != nil {
-			log.Fatalf("error: %s", err)
-		}
-		fmt.Println(r)
+		response, err = request(templateUrl(&host, templateMfaResponseUri(challenge.LogonId, &token)))
 	default:
-		log.Fatalf("unsupported Login Status")
+		log.Fatalf("unsupported Login Status: %d", challenge.LogonStatus)
 	}
 
-	fmt.Printf("Login succeeded, you may now (quickly) authenticate OpenVPN with `%s` and `%s` as your password\n", username, token)
+	if err != nil {
+		log.Fatalf("unable to perform response request: %s", err)
+	}
+
+	if response.LogonStatus != 1 {
+		log.Fatalf("response authentication failed: %v", response)
+	}
+
+	log.Printf("Login succeeded, you may now (quickly) authenticate OpenVPN with `%s` and `%s` as your password\n", username, token)
 }
 
-func readCredentials() (string, string, error) {
-	fmt.Printf("Username: ")
-	reader := bufio.NewReader(os.Stdin)
-	username, err := reader.ReadString('\n')
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Password: ")
-	password, err := term.ReadPassword(syscall.Stdin)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println()
-
-	// If an error occured, I don't care about which one it is.
-	return strings.TrimSpace(username), strings.TrimSpace(string(password)), err
-}
-
-func triggerChallengeResponse(host *string, username *string, password *string) (r Resp, err error) {
+func triggerChallengeResponse(host *string, username *string, password *string) (r WatchguardResponse, err error) {
 	return request(templateUrl(host, templateChallengeTriggerUri(username, password)))
 }
 
-func getToken(challenge *Resp) string {
-	fmt.Println(challenge.Challenge)
-
-	reader := bufio.NewReader(os.Stdin)
-	token, _ := reader.ReadString('\n')
-
-	return strings.TrimSpace(token)
-}
-
-func request(url string) (r Resp, err error) {
-	fmt.Println(url)
+func request(url string) (r WatchguardResponse, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return
@@ -112,7 +138,10 @@ func request(url string) (r Resp, err error) {
 
 	err = decoder.Decode(&r)
 	data, _ := io.ReadAll(&buf)
-	fmt.Printf("%s\n", data)
+	if debug {
+		log.Printf("Response: %s", data)
+	}
+
 	defer resp.Body.Close()
 
 	return

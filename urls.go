@@ -26,8 +26,8 @@ func templateResponseUri(logonId int, token *string) string {
 	v.Set("action", "sslvpn_logon")
 	v.Set("style", "fw_logon_progress.xsl")
 	v.Set("fw_logon_type", "response")
-	v.Set("response", *token)
 	v.Set("fw_logon_id", strconv.Itoa(logonId))
+	v.Set("response", *token)
 
 	return fmt.Sprintf(uriFormat, v.Encode())
 }
@@ -37,8 +37,8 @@ func templateMfaResponseUri(logonId int, choice *string) string {
 	v.Set("action", "sslvpn_logon")
 	v.Set("style", "fw_logon_progress.xsl")
 	v.Set("fw_logon_type", "mfa_response")
-	v.Set("mfa_choice", *choice)
 	v.Set("fw_logon_id", strconv.Itoa(logonId))
+	v.Set("mfa_choice", *choice)
 
 	return fmt.Sprintf(uriFormat, v.Encode())
 }
