@@ -1,4 +1,4 @@
-module github.com/tazjin/watchblob
+module github.com/cgroschupp/watchblob
 
 go 1.19
 
