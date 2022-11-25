@@ -21,14 +21,15 @@ func TestUnmarshalChallengeRespones(t *testing.T) {
   <chaStr>Enter Your 6 Digit Passcode </chaStr>
 </resp>`
 
-	var r Resp
+	var r WatchguardResponse
 	xml.Unmarshal([]byte(testXml), &r)
 
-	expected := Resp{
+	expected := WatchguardResponse{
 		Action:      "sslvpn_logon",
 		LogonStatus: 4,
 		LogonId:     441,
 		Challenge:   "Enter Your 6 Digit Passcode ",
+		AuthDomains: AuthDomains{AuthDomain: []AuthDomain{{Name: "RADIUS"}}},
 	}
 
 	assertEqual(t, expected, r)
@@ -48,13 +49,14 @@ func TestUnmarshalLoginError(t *testing.T) {
   <errStr>501</errStr>
 </resp>`
 
-	var r Resp
+	var r WatchguardResponse
 	xml.Unmarshal([]byte(testXml), &r)
 
-	expected := Resp{
+	expected := WatchguardResponse{
 		Action:      "sslvpn_logon",
 		LogonStatus: 2,
 		Error:       "501",
+		AuthDomains: AuthDomains{AuthDomain: []AuthDomain{{Name: "RADIUS"}}},
 	}
 
 	assertEqual(t, expected, r)
@@ -73,12 +75,13 @@ func TestUnmarshalLoginSuccess(t *testing.T) {
   </auth-domain-list>
 </resp>
 `
-	var r Resp
+	var r WatchguardResponse
 	xml.Unmarshal([]byte(testXml), &r)
 
-	expected := Resp{
+	expected := WatchguardResponse{
 		Action:      "sslvpn_logon",
 		LogonStatus: 1,
+		AuthDomains: AuthDomains{AuthDomain: []AuthDomain{{Name: "RADIUS"}}},
 	}
 
 	assertEqual(t, expected, r)
