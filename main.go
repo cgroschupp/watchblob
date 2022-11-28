@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/xml"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 )
 
 var debug bool
+var inSecure bool
 
 type AuthDomain struct {
 	Name string `xml:"name"`
@@ -52,6 +54,11 @@ func main() {
 				Name:  "debug",
 				Value: false,
 			},
+			&cli.BoolFlag{
+				Name:  "insecure",
+				Value: false,
+				Usage: "allow insecure ssl connection to watchguard",
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			username := cCtx.String("username")
@@ -73,6 +80,7 @@ func main() {
 				}
 			}
 			debug = cCtx.Bool("debug")
+			inSecure = cCtx.Bool("insecure")
 
 			run(cCtx.String("host"), username, password, token)
 
@@ -128,7 +136,11 @@ func triggerChallengeResponse(host *string, username *string, password *string) 
 }
 
 func request(url string) (r WatchguardResponse, err error) {
-	resp, err := http.Get(url)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: inSecure},
+	}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Get(url)
 	if err != nil {
 		return
 	}
