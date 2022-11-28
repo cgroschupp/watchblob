@@ -26,6 +26,10 @@ Make sure you have Go installed and `GOPATH` configured, then simply
 Right now the usage is very simple. Make sure you have the correct OpenVPN client
 config ready (this is normally supplied by the WatchGuard UI) simply run:
 
+```sh
+watchblob --host vpnserver.somedomain.org --username username --password p4ssw0rd
+```
+
 ```
 NAME:
    watchblob - 2-factor WatchGuard VPNs with OpenVPN
@@ -42,12 +46,8 @@ GLOBAL OPTIONS:
    --token value
    --host value
    --debug           (default: false)
+   --insecure        allow insecure ssl connection to watchguard (default: false)
    --help, -h        show help (default: false)
-```
-
-Example:
-```
-watchblob --host vpnserver.somedomain.org --username username --password p4ssw0rd
 ```
 
 The server responds with a challenge which is displayed to the user, wait until you
