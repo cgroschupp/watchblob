@@ -144,6 +144,8 @@ func request(url string) (r WatchguardResponse, err error) {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
+
 	var buf bytes.Buffer
 	tee := io.TeeReader(resp.Body, &buf)
 	decoder := xml.NewDecoder(tee)
@@ -153,8 +155,6 @@ func request(url string) (r WatchguardResponse, err error) {
 	if debug {
 		log.Printf("Response: %s", data)
 	}
-
-	defer resp.Body.Close()
 
 	return
 }
