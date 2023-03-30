@@ -38,10 +38,16 @@ func main() {
 		Usage: "2-factor WatchGuard VPNs with OpenVPN ",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name: "username",
+				Name:  "username",
+				Usage: "Username",
 			},
 			&cli.StringFlag{
-				Name: "password",
+				Name:  "password",
+				Usage: "Password",
+			},
+			&cli.BoolFlag{
+				Name:  "password-stdin",
+				Usage: "Take the password from stdin",
 			},
 			&cli.StringFlag{
 				Name: "token",
@@ -71,6 +77,16 @@ func main() {
 				if err != nil {
 					log.Fatalf("unable to read username: %s", err)
 				}
+			}
+
+			if cCtx.Bool("password-stdin") {
+				contents, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					return err
+				}
+
+				password = strings.TrimSuffix(string(contents), "\n")
+				password = strings.TrimSuffix(password, "\r")
 			}
 
 			if password == "" {
