@@ -41,13 +41,14 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --username value
-   --password value
-   --token value
-   --host value
-   --debug           (default: false)
+   --username value  Username
+   --password value  Password
+   --password-stdin  take the password from stdin (default: false)
+   --token value     token that is used to answer the challenge
+   --host value      Watchguard fqdn
+   --debug           enable debug output (default: false)
    --insecure        allow insecure ssl connection to watchguard (default: false)
-   --help, -h        show help (default: false)
+   --help, -h        show help
 ```
 
 The server responds with a challenge which is displayed to the user, wait until you

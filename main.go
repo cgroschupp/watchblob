@@ -36,7 +36,7 @@ type WatchguardResponse struct {
 func main() {
 	app := &cli.App{
 		Name:  "watchblob",
-		Usage: "2-factor WatchGuard VPNs with OpenVPN ",
+		Usage: "2-factor WatchGuard VPNs with OpenVPN",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "username",
@@ -48,18 +48,21 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "password-stdin",
-				Usage: "Take the password from stdin",
+				Usage: "take the password from stdin",
 			},
 			&cli.StringFlag{
-				Name: "token",
+				Name:  "token",
+				Usage: "token that is used to answer the challenge",
 			},
 			&cli.StringFlag{
 				Name:     "host",
 				Required: true,
+				Usage:    "Watchguard fqdn",
 			},
 			&cli.BoolFlag{
 				Name:  "debug",
 				Value: false,
+				Usage: "enable debug output",
 			},
 			&cli.BoolFlag{
 				Name:  "insecure",
