@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"syscall"
@@ -31,13 +32,18 @@ func readPassword() (string, error) {
 	return strings.TrimSpace(string(password)), err
 }
 
-func readToken(challenge *WatchguardResponse) (string, error) {
-	fmt.Println(challenge.Challenge)
-
-	reader := bufio.NewReader(os.Stdin)
-	token, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
+func readToken(challenge *WatchguardResponse, token string) (string, error) {
+	if token == "" {
+		fmt.Println(challenge.Challenge)
+		var err error
+		reader := bufio.NewReader(os.Stdin)
+		token, err = reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+	} else {
+		log.Printf("got as challage: `%s`, select `%s`\n", challenge.Challenge, token)
 	}
+
 	return strings.TrimSpace(token), nil
 }

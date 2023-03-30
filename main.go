@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli/v2"
 )
@@ -119,12 +120,11 @@ func run(host, username, password, token string) {
 		log.Fatalf("Challenge authentication failed, with login status: %d(%s)", challenge.LogonStatus, challenge.Error)
 	}
 
-	if token == "" {
-		token, err = readToken(&challenge)
-		if err != nil {
-			log.Fatalf("unable to read token: %s", err)
-		}
+	token, err = readToken(&challenge, token)
+	if err != nil {
+		log.Fatalf("unable to read token: %s", err)
 	}
+
 	var response WatchguardResponse
 
 	switch challenge.LogonStatus {
