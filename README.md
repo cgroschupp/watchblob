@@ -18,8 +18,11 @@ and what is actually going on in this protocol.
 
 ## Installation
 
-Make sure you have Go installed and `GOPATH` configured, then simply
-`go install github.com/cgroschupp/watchblob/...`.
+Make sure you have Go installed and `GOPATH` configured, then simply:
+
+```sh
+go install github.com/cgroschupp/watchblob@main
+```
 
 ## Usage
 
